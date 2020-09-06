@@ -49,6 +49,22 @@ func New() (*Device, error) {
 		return nil, ErrNotDevice
 	}
 
+	err = d.Reset()
+	if err != nil {
+		return nil, fmt.Errorf("max30102: could not reset device: %w", err)
+	}
+	_, err = d.Options(
+		RedPulseAmp(2.4),
+		IRPulseAmp(2.4),
+		PulseWidth(PW411),
+		SampleRate(SR100),
+		InterruptEnable(NewFIFOData),
+		Mode(ModeHR),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("max30102: could not initialize device: %w", err)
+	}
+
 	return d, nil
 }
 
@@ -64,6 +80,29 @@ func (d *Device) RevID() (byte, error) {
 		return 0, fmt.Errorf("max30102: could not get revision ID: %w", err)
 	}
 	return rev, nil
+}
+
+func (d *Device) waitUntil(reg, flag byte, bit byte) error {
+	switch bit {
+	case 1:
+		for {
+			if state, err := d.Read(reg); err != nil {
+				return fmt.Errorf("could not wait for %v in %v to be %v", flag, reg, bit)
+			} else if state&flag != 0 {
+				return nil
+			}
+		}
+	case 0:
+		for {
+			if state, err := d.Read(reg); err != nil {
+				return fmt.Errorf("could not wait for %v in %v to be %v", flag, reg, bit)
+			} else if state&flag == 0 {
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("invalid bit %v, it should be 1 or 0", bit)
 }
 
 func (d *Device) tempEnable() error {
@@ -86,12 +125,8 @@ func (d *Device) Temperature() (float64, error) {
 	if err := d.tempEnable(); err != nil {
 		return 0, err
 	}
-	for {
-		if r, err := d.tempReady(); r == true {
-			break
-		} else if err != nil {
-			return 0, err
-		}
+	if err := d.waitUntil(TempCfg, TempEna, 0); err != nil {
+		return 0, err
 	}
 
 	i, err := d.Read(TempInt)
@@ -104,7 +139,7 @@ func (d *Device) Temperature() (float64, error) {
 		return 0, fmt.Errorf("max30102: could not read fractional part of temperature: %w", err)
 	}
 
-	return float64(i) + (float64(f) * 0.0625), nil
+	return float64(int8(i)) + (float64(f) * 0.0625), nil
 }
 
 // Read reads a single byte from a register.
@@ -139,4 +174,50 @@ func (d *Device) Write(reg, data byte) error {
 	}
 
 	return nil
+}
+
+// Reset resets the device. All configurations, thresholds, and data registers
+// are reset to their power-on state.
+func (d *Device) Reset() error {
+	if err := d.Write(ModeCfg, ResetControl); err != nil {
+		return fmt.Errorf("max30102: could not reset: %w", err)
+	}
+	if err := d.waitUntil(ModeCfg, ResetControl, 0); err != nil {
+		return fmt.Errorf("max30102: could not reset: %w", err)
+	}
+
+	return nil
+}
+
+// RedIR returns the value of the red LED and IR LED. The values are normalized
+// from 0.0 to 1.0.
+func (d *Device) RedIR() (red, ir float64, err error) {
+	const maxADC = 262143
+	const msbMask byte = 0b0000_0011
+
+	err = d.waitUntil(IntStat1, NewFIFOData, 1)
+	if err != nil {
+		return 0, 0, nil
+	}
+
+	bytes, err := d.ReadBytes(FIFOData, 6)
+	if err != nil {
+		return 0, 0, nil
+	}
+
+	red = float64(
+		int(bytes[0]&msbMask)<<16|
+			int(bytes[1])<<8|
+			int(bytes[2])) / maxADC
+	ir = float64(
+		int(bytes[3]&msbMask)<<16|
+			int(bytes[4])<<8|
+			int(bytes[5])) / maxADC
+
+	return red, ir, nil
+}
+
+func (d *Device) debugRegister(reg byte) {
+	b, _ := d.Read(reg)
+	fmt.Printf("%#x = %b\n", reg, b)
 }

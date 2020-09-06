@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -22,66 +23,125 @@ func main() {
 	case max30102.PartID:
 		fmt.Printf("MAX30102 rev.%d detected\n", sensor.RevID)
 	}
+	fmt.Println("------------------------------")
 
-	t := time.NewTicker(500 * time.Millisecond)
+	hrCh := make(chan float64)
+	tempCh := make(chan float64)
 
-	for {
-		temp, err := sensor.Temperature()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("\rtemp = %02.2f ", temp)
-		<-t.C
-	}
-
-	/*
-
-		// reset
-		reg := make([]byte, 1)
-		if err := d.Tx([]byte{maxModeCfg}, reg); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not read register: %w", err))
-		}
-		if _, err := d.Write([]byte{maxModeCfg, reg[0] & 0x40}); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not configure mode: %w", err))
-		}
-		// start
-		reg = make([]byte, 1)
-		if err := d.Tx([]byte{maxModeCfg}, reg); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not read register: %w", err))
-		}
-		if _, err := d.Write([]byte{maxModeCfg, reg[0] & 0x7F}); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not configure mode: %w", err))
-		}
-
-		// begin
-		if _, err := d.Write([]byte{maxModeCfg, 0x02}); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not configure mode: %w", err))
-		}
-		if _, err := d.Write([]byte{maxLedCfg, mA500}); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not configure LED: %w", err))
-		}
-		if _, err := d.Write([]byte{maxSpO2Cfg, (sr100 << 2) | pw1600}); err != nil {
-			log.Fatal(fmt.Errorf("max30100: could not configure SpO2: %w", err))
-		}
-
-		read := func() {
-			// readSensor
-			write := []byte{maxFifoData}
-			read := make([]byte, 4)
-			if err := d.Tx(write, read); err != nil {
+	go func() {
+		for {
+			t := time.NewTicker(200 * time.Millisecond)
+			hr, err := sensor.HeartRate()
+			if errors.Is(err, max3010x.ErrNotDetected) {
+				hr = 0
+			} else if err != nil {
 				log.Fatal(err)
 			}
-
-			fmt.Printf("read = %#x\n", read)
-
-			ir := (uint16(read[0]) << 8) | uint16(read[1])
-			red := (uint16(read[2]) << 8) | uint16(read[3])
-
-			fmt.Printf("ir = %+v\n", ir)
-			fmt.Printf("red = %+v\n", red)
+			select {
+			case hrCh <- hr:
+			}
+			<-t.C
 		}
+	}()
 
-		//t := time.NewTicker(10 * time.Millisecond)
-		read()
-	*/
+	go func() {
+		for {
+			t := time.NewTicker(1 * time.Second)
+			temp, err := sensor.Temperature()
+			if err != nil {
+				log.Fatal(temp)
+			}
+			select {
+			case tempCh <- temp:
+			}
+			<-t.C
+		}
+	}()
+
+	rawCh := make(chan []float64)
+	go func() {
+		for {
+			red, ir, err := sensor.Leds()
+			if err != nil {
+				log.Fatal(err)
+			}
+			red -= 0.30
+			red *= 300
+			ir -= 0.30
+			ir *= 300
+			if red < 0 {
+				red = 0
+			}
+			if ir < 0 {
+				ir = 0
+			}
+			select {
+			case rawCh <- []float64{red, ir}:
+			}
+		}
+	}()
+
+	spO2Ch := make(chan float64)
+	go func() {
+		t := time.NewTicker(200 * time.Millisecond)
+		for {
+			spO2, err := sensor.SpO2()
+			if errors.Is(err, max3010x.ErrNotDetected) {
+				spO2 = 0
+			} else if err != nil {
+				log.Fatal(err)
+			}
+			select {
+			case spO2Ch <- spO2:
+			}
+			<-t.C
+		}
+	}()
+
+	t := time.NewTicker(50 * time.Millisecond)
+
+	fmt.Printf("\n\n\n\n\n")
+
+	temp := 0.0
+	hr := 0.0
+	spO2 := 0.0
+	raw := make([]float64, 2)
+
+	for {
+		select {
+		case temp = <-tempCh:
+		case hr = <-hrCh:
+		case spO2 = <-spO2Ch:
+		case raw = <-rawCh:
+		}
+		fmt.Printf("\033[5F")
+		fmt.Printf("sensor temp\t: %2.1fC        \n", temp)
+		if hr == 0 {
+			fmt.Printf("heart rate\t: --             \n")
+		} else {
+			fmt.Printf("heart rate\t: %3.2fbpm       \n", hr)
+		}
+		if spO2 == 0 {
+			fmt.Printf("SpO2\t\t: --                   \n")
+		} else {
+			fmt.Printf("SpO2\t\t: %3.2f%%              \n", spO2)
+		}
+		fmt.Printf("red LED\t\t: %s              \n", float2bar(raw[0]))
+		fmt.Printf("IR LED\t\t: %s               \n", float2bar(raw[1]))
+		<-t.C
+	}
+}
+
+func float2bar(n float64) string {
+	block := []string{"", "▏", "▏", "▎", "▍", "▌", "▋", "▊", "▊", "▉"}
+	t := int(n)
+	s := ""
+	f := int((n - float64(t)) * 10)
+
+	for i := 0; i < t; i++ {
+		s += "█"
+	}
+	s += block[f]
+
+	return s
 }

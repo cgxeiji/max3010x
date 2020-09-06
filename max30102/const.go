@@ -24,6 +24,18 @@ const (
 	RegPartID        = 0xFF
 )
 
+// Interrupt flags
+const (
+	// Status 1
+	AlmostFull            byte = (1 << 7)
+	NewFIFOData           byte = (1 << 6)
+	AmbientLightCancelOvf byte = (1 << 5)
+	PowerReady            byte = (1 << 0)
+
+	// Status 2
+	DieTempReady byte = (1 << 1)
+)
+
 // Device constants
 const (
 	Addr   = 0x57
@@ -32,5 +44,35 @@ const (
 
 // Settings
 const (
-	TempEna = 0b0000_0001
+	TempEna      byte = 0b0000_0001
+	ModeHR       byte = 0b010
+	ModeSpO2     byte = 0b011
+	ModeMultiLed byte = 0b111
+	modeMask     byte = 0b1111_1000
+
+	ResetControl = 0b0100_0000
+)
+
+// SpO2 Sample Rate Control
+const (
+	SR50 = (iota << 2)
+	SR100
+	SR200
+	SR400
+	SR800
+	SR1000
+	SR1600
+	SR3200
+
+	srMask byte = 0b1_11_000_11
+)
+
+// LED Pulse Width Control
+const (
+	PW69 = iota
+	PW118
+	PW215
+	PW411
+
+	pwMask byte = 0b1_11_111_00
 )
