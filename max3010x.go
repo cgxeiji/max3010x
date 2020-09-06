@@ -8,11 +8,17 @@ import (
 	"github.com/cgxeiji/max3010x/max30102"
 )
 
-// Errors
 var (
+	// ErrWrongDevice is thrown when trying to convert a max3010x.Device
+	// interface to the underlying *Device struct and the device does not match
+	// the PartID.
 	ErrWrongDevice = errors.New("wrong device")
+	// ErrNotDetected is thrown when trying to read a heart rate or SpO2 level
+	// and nothing is detected on the sensor (e.g. no finger is placed on the
+	// sensor when the function is called).
 	ErrNotDetected = errors.New("nothing detect on the sensor")
-	errLowValue    = errors.New("low value")
+
+	errLowValue = errors.New("low value")
 )
 
 // Device defines a MAX3010x device.
@@ -21,6 +27,9 @@ type Device struct {
 	redLED tSeries
 	irLED  tSeries
 
+	// PartID is the byte part ID as set by the manufacturer.
+	// MAX30100: 0x11 or max30100.PartID
+	// MAX30102: 0x15 or max30102.PartID
 	PartID byte
 	RevID  byte
 }
@@ -29,7 +38,7 @@ type sensor interface {
 	Temperature() (float64, error)
 	RevID() (byte, error)
 	Reset() error
-	RedIR() (float64, float64, error)
+	IRRed() (float64, float64, error)
 
 	Close()
 }
@@ -138,22 +147,13 @@ func (d *Device) detectFall() error {
 }
 
 func (d *Device) leds() error {
-	r, ir, err := d.sensor.RedIR()
+	r, ir, err := d.sensor.IRRed()
 	if err != nil {
 		return fmt.Errorf("could not get LEDs: %w", err)
 	}
 	d.redLED.add(r)
 	d.irLED.add(ir)
 	return nil
-}
-
-// Leds is fantastic.
-func (d *Device) Leds() (float64, float64, error) {
-	err := d.leds()
-	if err != nil {
-		return 0, 0, err
-	}
-	return d.redLED.mean, d.irLED.mean, nil
 }
 
 // SpO2 returns the SpO2 value in 100%.

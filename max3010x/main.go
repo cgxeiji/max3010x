@@ -17,17 +17,17 @@ func main() {
 	}
 	defer sensor.Close()
 
+	// Check which sensor is connected using the PartID.
 	switch sensor.PartID {
-	case 0x11:
+	case 0x11: // TODO: test with MAX30100
 		fmt.Printf("MAX30100 rev.%d detected\n", sensor.RevID)
 	case max30102.PartID:
 		fmt.Printf("MAX30102 rev.%d detected\n", sensor.RevID)
 	}
-	fmt.Println("------------------------------")
+	fmt.Println("---------------------------")
 
+	// Read the heart rate every 200ms.
 	hrCh := make(chan float64)
-	tempCh := make(chan float64)
-
 	go func() {
 		for {
 			t := time.NewTicker(200 * time.Millisecond)
@@ -44,43 +44,7 @@ func main() {
 		}
 	}()
 
-	go func() {
-		for {
-			t := time.NewTicker(1 * time.Second)
-			temp, err := sensor.Temperature()
-			if err != nil {
-				log.Fatal(temp)
-			}
-			select {
-			case tempCh <- temp:
-			}
-			<-t.C
-		}
-	}()
-
-	rawCh := make(chan []float64)
-	go func() {
-		for {
-			red, ir, err := sensor.Leds()
-			if err != nil {
-				log.Fatal(err)
-			}
-			red -= 0.30
-			red *= 300
-			ir -= 0.30
-			ir *= 300
-			if red < 0 {
-				red = 0
-			}
-			if ir < 0 {
-				ir = 0
-			}
-			select {
-			case rawCh <- []float64{red, ir}:
-			}
-		}
-	}()
-
+	// Read the SpO2 every 200ms.
 	spO2Ch := make(chan float64)
 	go func() {
 		t := time.NewTicker(200 * time.Millisecond)
@@ -95,6 +59,58 @@ func main() {
 			case spO2Ch <- spO2:
 			}
 			<-t.C
+		}
+	}()
+
+	// Read the sensor's temperature every second.
+	tempCh := make(chan float64)
+	go func() {
+		for {
+			t := time.NewTicker(1 * time.Second)
+			temp, err := sensor.Temperature()
+			if err != nil {
+				log.Fatal(temp)
+			}
+			select {
+			case tempCh <- temp:
+			}
+			<-t.C
+		}
+	}()
+
+	// Access the underlying device for low level functions.
+	// Read raw LED values as fast as possible.
+	rawCh := make(chan []float64)
+	go func() {
+		device, err := sensor.ToMax30102()
+		if errors.Is(err, max3010x.ErrWrongDevice) {
+			fmt.Println("device is not MAX30102")
+			return
+		} else if err != nil {
+			log.Fatal(err)
+		}
+		for {
+			ir, red, err := device.IRRed()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// Adjusting raw value for visualization
+			ir -= 0.30
+			ir *= 300
+			if ir < 0 {
+				ir = 0
+			}
+
+			// Adjusting raw value for visualization
+			red -= 0.30
+			red *= 300
+			if red < 0 {
+				red = 0
+			}
+			select {
+			case rawCh <- []float64{red, ir}:
+			}
 		}
 	}()
 

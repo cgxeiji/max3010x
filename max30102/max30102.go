@@ -189,9 +189,9 @@ func (d *Device) Reset() error {
 	return nil
 }
 
-// RedIR returns the value of the red LED and IR LED. The values are normalized
+// IRRed returns the value of the red LED and IR LED. The values are normalized
 // from 0.0 to 1.0.
-func (d *Device) RedIR() (red, ir float64, err error) {
+func (d *Device) IRRed() (ir, red float64, err error) {
 	const maxADC = 262143
 	const msbMask byte = 0b0000_0011
 
