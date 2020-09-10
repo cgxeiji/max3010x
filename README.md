@@ -4,6 +4,18 @@ Go library to use the MAX3010x sensor for heart rate and SpO2 readings.
 | :bangbang: | **This library has only been tested with a `MAX30102`. If you have a `MAX30100`, please help me with testing.** |
 | :---: | :--- |
 
+
+## TL;DR
+
+You can download and build this test program:
+
+```sh
+$ go get github.com/cgxeiji/max3010x/max3010x
+$ max3010x
+```
+
+![demo.gif](./max3010x/demo.gif)
+
 ## How to use?
 
 It is as simple as:
@@ -67,15 +79,6 @@ func main() {
         log.Fatal(err)
     }
 }
-```
-
-## I just want to see your library works!
-
-Then you can download and build this test program:
-
-```sh
-$ go get github.com/cgxeiji/max3010x/max3010x
-$ max3010x
 ```
 
 ## Any questions or feedback?
