@@ -1,7 +1,14 @@
 # max3010x
-Go library to use the MAX3010x sensor for heart rate and SpO2 readings.
 
-| :bangbang: | **This library has only been tested with a `MAX30102`. If you have a `MAX30100`, please help me with testing.** |
+[![Version](https://img.shields.io/github/v/tag/cgxeiji/max3010x?sort=semver)](https://github.com/cgxeiji/max3010x/releases)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/cgxeiji/max3010x)](https://pkg.go.dev/github.com/cgxeiji/max3010x)
+[![License](https://img.shields.io/github/license/cgxeiji/max3010x)](https://github.com/cgxeiji/max3010x/blob/master/LICENSE)
+![Go version](https://img.shields.io/github/go-mod/go-version/cgxeiji/max3010x)
+
+Go library to use the MAX3010x sensor for heart rate and SpO2 readings. Uses
+[periph.io](https://periph.io/) to handle I2C communication with the sensor.
+
+| :bangbang: | **This library has only been tested with a `MAX30102` on a `Raspberry Pi 4`. If you have a `MAX30100`, please help me with testing.** |
 | :---: | :--- |
 
 
