@@ -43,6 +43,16 @@ func Mode(mode byte) Option {
 			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
 		}
 
+		if err = d.Write(FIFOWrPtr, 0); err != nil {
+			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+		}
+		if err = d.Write(OvfCount, 0); err != nil {
+			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+		}
+		if err = d.Write(FIFORdPtr, 0); err != nil {
+			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+		}
+
 		return Mode(old), nil
 	}
 }
@@ -122,5 +132,19 @@ func InterruptEnable(i byte) Option {
 		}
 
 		return InterruptEnable(old), nil
+	}
+}
+
+// AlmostFullValue sets when the AlmostFull interrupt should be triggered. It
+// can take values from 0 to 15.
+func AlmostFullValue(left byte) Option {
+	return func(d *Device) (Option, error) {
+		left &= ^fifoFullMask
+		old, err := d.config(FIFOCfg, fifoFullMask, left)
+		if err != nil {
+			return nil, fmt.Errorf("max30102: could not configure almost full value to %d: %w", left, err)
+		}
+
+		return AlmostFullValue(old), nil
 	}
 }
