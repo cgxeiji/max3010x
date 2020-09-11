@@ -49,6 +49,7 @@ const (
 	ModeSpO2     byte = 0b011
 	ModeMultiLed byte = 0b111
 	modeMask     byte = 0b1111_1000
+	modeSHDN     byte = (1 << 7)
 
 	ResetControl = 0b0100_0000
 )
@@ -75,4 +76,9 @@ const (
 	PW411
 
 	pwMask byte = 0b1_11_111_00
+)
+
+// masks
+const (
+	fifoFullMask byte = 0b111_1_0000
 )

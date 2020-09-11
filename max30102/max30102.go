@@ -21,7 +21,9 @@ type Device struct {
 	bus i2c.BusCloser
 }
 
-// New returns a new MAX30102 device.
+// New returns a new MAX30102 device. By default, this sets the LED pulse
+// amplitude to 2.4mA, with a pulse width of 411us and a sample rate of 100
+// samples/s.
 func New() (*Device, error) {
 	if _, err := host.Init(); err != nil {
 		return nil, fmt.Errorf("max30102: could not initialize host: %w", err)
@@ -58,8 +60,9 @@ func New() (*Device, error) {
 		IRPulseAmp(2.4),
 		PulseWidth(PW411),
 		SampleRate(SR100),
-		InterruptEnable(NewFIFOData),
-		Mode(ModeHR),
+		InterruptEnable(NewFIFOData|AlmostFull),
+		AlmostFullValue(15),
+		Mode(ModeSpO2),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("max30102: could not initialize device: %w", err)
@@ -70,6 +73,7 @@ func New() (*Device, error) {
 
 // Close closes the devices and cleans after itself.
 func (d *Device) Close() {
+	d.Shutdown()
 	d.bus.Close()
 }
 
@@ -86,9 +90,11 @@ func (d *Device) waitUntil(reg, flag byte, bit byte) error {
 	switch bit {
 	case 1:
 		for {
-			if state, err := d.Read(reg); err != nil {
+			state, err := d.Read(reg)
+			if err != nil {
 				return fmt.Errorf("could not wait for %v in %v to be %v", flag, reg, bit)
 			} else if state&flag != 0 {
+				//fmt.Printf("%#x = %#b\n", reg, state)
 				return nil
 			}
 		}
@@ -97,6 +103,7 @@ func (d *Device) waitUntil(reg, flag byte, bit byte) error {
 			if state, err := d.Read(reg); err != nil {
 				return fmt.Errorf("could not wait for %v in %v to be %v", flag, reg, bit)
 			} else if state&flag == 0 {
+				//fmt.Printf("%#x = %#b\n", reg, state)
 				return nil
 			}
 		}
@@ -197,12 +204,12 @@ func (d *Device) IRRed() (ir, red float64, err error) {
 
 	err = d.waitUntil(IntStat1, NewFIFOData, 1)
 	if err != nil {
-		return 0, 0, nil
+		return 0, 0, err
 	}
 
 	bytes, err := d.ReadBytes(FIFOData, 6)
 	if err != nil {
-		return 0, 0, nil
+		return 0, 0, err
 	}
 
 	red = float64(
@@ -215,6 +222,13 @@ func (d *Device) IRRed() (ir, red float64, err error) {
 			int(bytes[5])) / maxADC
 
 	return red, ir, nil
+}
+
+// Shutdown sets the device into power-save mode.
+func (d *Device) Shutdown() error {
+	_, err := d.config(ModeCfg, ^modeSHDN, modeSHDN)
+
+	return err
 }
 
 func (d *Device) debugRegister(reg byte) {
