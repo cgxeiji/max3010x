@@ -56,14 +56,15 @@ func New() (*Device, error) {
 		return nil, fmt.Errorf("max30102: could not reset device: %w", err)
 	}
 	_, err = d.Options(
-		RedPulseAmp(2.4),
-		IRPulseAmp(2.4),
+		RedPulseAmp(2.8),
+		IRPulseAmp(2.8),
 		PulseWidth(PW411),
 		SampleRate(SR100),
 		InterruptEnable(NewFIFOData|AlmostFull),
-		AlmostFullValue(15),
+		AlmostFullValue(0),
 		Mode(ModeSpO2),
 	)
+	d.drain()
 	if err != nil {
 		return nil, fmt.Errorf("max30102: could not initialize device: %w", err)
 	}
@@ -212,16 +213,92 @@ func (d *Device) IRRed() (ir, red float64, err error) {
 		return 0, 0, err
 	}
 
-	red = float64(
-		int(bytes[0]&msbMask)<<16|
-			int(bytes[1])<<8|
-			int(bytes[2])) / maxADC
 	ir = float64(
 		int(bytes[3]&msbMask)<<16|
 			int(bytes[4])<<8|
 			int(bytes[5])) / maxADC
+	red = float64(
+		int(bytes[0]&msbMask)<<16|
+			int(bytes[1])<<8|
+			int(bytes[2])) / maxADC
 
-	return red, ir, nil
+	return ir, red, nil
+}
+
+// IRRedBatch returns a batch of IR and red LED values based on the AlmostFull
+// flag. The amount of data returned can be configured by setting the
+// AlmostFullValue leftover value, which is set to 0 by default. Therefore,
+// this function returns 32 samples by default.
+func (d *Device) IRRedBatch() (ir, red []float64, err error) {
+	const maxADC = 262143
+	const msbMask byte = 0b0000_0011
+
+	err = d.drain()
+	if err != nil {
+		return nil, nil, fmt.Errorf("max30102: could not empty FIFO: %w", err)
+	}
+	err = d.waitUntil(IntStat1, AlmostFull, 1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("max30102: error waiting for almost full interrupt: %w", err)
+	}
+
+	n, err := d.available()
+	if err != nil {
+		return nil, nil, fmt.Errorf("max30102: error reading available data: %w", err)
+	}
+
+	ir = make([]float64, n)
+	red = make([]float64, n)
+	for i := 0; i < n; i++ {
+		bytes, err := d.ReadBytes(FIFOData, 6)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		irData := float64(
+			int(bytes[3]&msbMask)<<16|
+				int(bytes[4])<<8|
+				int(bytes[5])) / maxADC
+		redData := float64(
+			int(bytes[0]&msbMask)<<16|
+				int(bytes[1])<<8|
+				int(bytes[2])) / maxADC
+
+		ir[i] = irData
+		red[i] = redData
+	}
+
+	return ir, red, nil
+}
+
+func (d *Device) drain() error {
+	n, err := d.available()
+	if err != nil {
+		return err
+	}
+	for i := 0; i < n; i++ {
+		_, err := d.ReadBytes(FIFOData, 6)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Device) available() (int, error) {
+	wr, err := d.Read(FIFOWrPtr)
+	if err != nil {
+		return 0, nil
+	}
+	rd, err := d.Read(FIFORdPtr)
+	if err != nil {
+		return 0, nil
+	}
+
+	if wr == rd {
+		return 32, nil
+	}
+	return (int(wr) + 32 - int(rd)) % 32, nil
 }
 
 // Shutdown sets the device into power-save mode.
@@ -231,7 +308,14 @@ func (d *Device) Shutdown() error {
 	return err
 }
 
+// Startup wakes the device from power-save mode.
+func (d *Device) Startup() error {
+	_, err := d.config(ModeCfg, ^modeSHDN, ^modeSHDN)
+
+	return err
+}
+
 func (d *Device) debugRegister(reg byte) {
 	b, _ := d.Read(reg)
-	fmt.Printf("%#x = %b\n", reg, b)
+	fmt.Printf("%#x = %#x (%#b)\n", reg, b, b)
 }

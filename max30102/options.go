@@ -27,6 +27,7 @@ func (d *Device) config(reg, mask, flag byte) (byte, error) {
 	}
 	old := cfg &^ mask
 	cfg &= mask
+	flag = flag &^ mask
 	cfg |= flag
 	if err := d.Write(reg, cfg); err != nil {
 		return 0, fmt.Errorf("could not set %v in %v: %w", flag, reg, err)
@@ -40,17 +41,17 @@ func Mode(mode byte) Option {
 	return func(d *Device) (Option, error) {
 		old, err := d.config(ModeCfg, modeMask, mode)
 		if err != nil {
-			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+			return nil, fmt.Errorf("max30102: could not configure mode %#x: %w", mode, err)
 		}
 
 		if err = d.Write(FIFOWrPtr, 0); err != nil {
-			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+			return nil, fmt.Errorf("max30102: could not configure mode %#x: %w", mode, err)
 		}
 		if err = d.Write(OvfCount, 0); err != nil {
-			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+			return nil, fmt.Errorf("max30102: could not configure mode %#x: %w", mode, err)
 		}
 		if err = d.Write(FIFORdPtr, 0); err != nil {
-			return nil, fmt.Errorf("max30102: could not configure mode: %w", err)
+			return nil, fmt.Errorf("max30102: could not configure mode %#x: %w", mode, err)
 		}
 
 		return Mode(old), nil

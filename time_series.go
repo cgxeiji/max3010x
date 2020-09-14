@@ -18,14 +18,16 @@ func (t *tSeries) init(size, smooth int) {
 	t.idxS = 0
 }
 
-func (t *tSeries) add(n float64) {
-	t.sum -= t.smooth[t.idxS]
-	t.sum += n
-	t.smooth[t.idxS] = n
-	t.idxS = (t.idxS + 1) % len(t.smooth)
+func (t *tSeries) add(entries ...float64) {
+	for _, e := range entries {
+		t.sum -= t.smooth[t.idxS]
+		t.sum += e
+		t.smooth[t.idxS] = e
+		t.idxS = (t.idxS + 1) % len(t.smooth)
 
-	t.data[t.idxD] = n
-	t.idxD = (t.idxD + 1) % len(t.data)
+		t.data[t.idxD] = e
+		t.idxD = (t.idxD + 1) % len(t.data)
+	}
 
 	t.mean = t.sum / float64(len(t.smooth))
 }
