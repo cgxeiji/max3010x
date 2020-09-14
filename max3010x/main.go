@@ -27,7 +27,7 @@ func main() {
 	case max30102.PartID:
 		fmt.Printf("MAX30102 rev.%d detected\n", sensor.RevID)
 	}
-	fmt.Println("   Press [ENTER] to exit   ")
+	fmt.Println("Press [ENTER] to exit")
 	fmt.Println("---------------------------")
 
 	done := make(chan struct{})
@@ -193,7 +193,6 @@ func main() {
 	}()
 
 	bufio.NewReader(os.Stdin).ReadString('\n')
-	fmt.Println("exit")
 	close(done)
 	wg.Wait()
 }
