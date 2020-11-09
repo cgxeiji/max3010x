@@ -31,7 +31,7 @@ func New() (*Device, error) {
 
 	bus, err := i2creg.Open("")
 	if err != nil {
-		return nil, fmt.Errorf("max30102: could not open i2c bus: %w", err)
+		return nil, fmt.Errorf("max30102: could not open I2C bus: %w", err)
 	}
 	dev := &i2c.Dev{
 		Addr: Addr,
@@ -55,7 +55,7 @@ func New() (*Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("max30102: could not reset device: %w", err)
 	}
-	_, err = d.Options(
+	if _, err = d.Options(
 		RedPulseAmp(2.8),
 		IRPulseAmp(2.8),
 		PulseWidth(PW411),
@@ -63,11 +63,10 @@ func New() (*Device, error) {
 		InterruptEnable(NewFIFOData|AlmostFull),
 		AlmostFullValue(0),
 		Mode(ModeSpO2),
-	)
-	d.drain()
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("max30102: could not initialize device: %w", err)
 	}
+	d.drain()
 
 	return d, nil
 }

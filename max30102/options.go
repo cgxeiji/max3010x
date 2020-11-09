@@ -5,7 +5,7 @@ import "fmt"
 // Option defines a functional option for the device.
 type Option func(d *Device) (Option, error)
 
-// Options set different configuration options and returns the previous value
+// Options sets different configuration options and returns the previous value
 // of the last option passed.
 func (d *Device) Options(options ...Option) (Option, error) {
 	var old Option
