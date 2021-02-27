@@ -24,12 +24,15 @@ type Device struct {
 // New returns a new MAX30102 device. By default, this sets the LED pulse
 // amplitude to 2.4mA, with a pulse width of 411us and a sample rate of 100
 // samples/s.
-func New() (*Device, error) {
+//
+// Argument "busName" can be used to specify the exact bus to use ("/dev/i2c-2", "I2C2", "2").
+// If "busName" argument is specified as an empty string "" the first available bus will be used.
+func New(busName string) (*Device, error) {
 	if _, err := host.Init(); err != nil {
 		return nil, fmt.Errorf("max30102: could not initialize host: %w", err)
 	}
 
-	bus, err := i2creg.Open("")
+	bus, err := i2creg.Open(busName)
 	if err != nil {
 		return nil, fmt.Errorf("max30102: could not open i2c bus: %w", err)
 	}

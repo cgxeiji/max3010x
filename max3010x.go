@@ -57,7 +57,15 @@ const threshold = 0.10
 
 // New returns a new MAX3010x device.
 func New() (*Device, error) {
-	sensor, err := max30102.New()
+	return NewOnBus("")
+}
+
+// NewOnBus returns a new MAX3010x device located on a specific bus.
+//
+// Use NewOnBus if an application knows the exact bus to use ("/dev/i2c-2", "I2C2", "2").
+// If "bus" argument is specified as an empty string "" the first available bus will be used.
+func NewOnBus(bus string) (*Device, error) {
+	sensor, err := max30102.New(bus)
 	if err != nil {
 		return nil, err
 	}
