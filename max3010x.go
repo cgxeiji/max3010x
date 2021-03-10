@@ -38,6 +38,9 @@ type Device struct {
 	// MAX30102: 0x15 or max30102.PartID
 	PartID byte
 	RevID  byte
+
+	bus string
+	addr uint16
 }
 
 type sensor interface {
@@ -56,23 +59,23 @@ type sensor interface {
 const threshold = 0.10
 
 // New returns a new MAX3010x device.
-func New() (*Device, error) {
-	return NewOnBus("")
-}
+func New(options ...Option) (*Device, error) {
+	var (
+		d = &Device{
+			readCh: make(chan struct{}, 1),
+		}
+		err error
+	)
 
-// NewOnBus returns a new MAX3010x device located on a specific bus.
-//
-// Use NewOnBus if an application knows the exact bus to use ("/dev/i2c-2", "I2C2", "2").
-// If "bus" argument is specified as an empty string "" the first available bus will be used.
-func NewOnBus(bus string) (*Device, error) {
-	sensor, err := max30102.New(bus)
-	if err != nil {
-		return nil, err
+	for _, option := range options {
+		option.Apply(d)
 	}
 
-	d := &Device{
-		sensor: sensor,
-		readCh: make(chan struct{}, 1),
+	if d.sensor == nil {
+		d.sensor, err = max30102.New(d.bus, d.addr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	d.PartID = max30102.PartID

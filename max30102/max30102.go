@@ -26,8 +26,9 @@ type Device struct {
 // samples/s.
 //
 // Argument "busName" can be used to specify the exact bus to use ("/dev/i2c-2", "I2C2", "2").
+// Argument "addr" can be used to specify alternative address if default (0x57) is unavailable and changed.
 // If "busName" argument is specified as an empty string "" the first available bus will be used.
-func New(busName string) (*Device, error) {
+func New(busName string, addr uint16) (*Device, error) {
 	if _, err := host.Init(); err != nil {
 		return nil, fmt.Errorf("max30102: could not initialize host: %w", err)
 	}
@@ -36,8 +37,13 @@ func New(busName string) (*Device, error) {
 	if err != nil {
 		return nil, fmt.Errorf("max30102: could not open i2c bus: %w", err)
 	}
+
+	if addr == 0 {
+		addr = Addr
+	}
+
 	dev := &i2c.Dev{
-		Addr: Addr,
+		Addr: addr,
 		Bus:  bus,
 	}
 
