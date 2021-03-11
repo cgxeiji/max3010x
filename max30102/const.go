@@ -82,3 +82,8 @@ const (
 const (
 	fifoFullMask byte = 0b111_1_0000
 )
+
+const (
+	maxADC  = (1 << 18) - 1
+	halfADC = (1 << 17) - 1
+)

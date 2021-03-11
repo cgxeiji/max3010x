@@ -3,6 +3,7 @@ package max30102
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"periph.io/x/periph/conn/i2c"
 	"periph.io/x/periph/conn/i2c/i2creg"
@@ -199,7 +200,6 @@ func (d *Device) Reset() error {
 // IRRed returns the value of the red LED and IR LED. The values are normalized
 // from 0.0 to 1.0.
 func (d *Device) IRRed() (ir, red float64, err error) {
-	const maxADC = 262143
 	const msbMask byte = 0b0000_0011
 
 	err = d.waitUntil(IntStat1, NewFIFOData, 1)
@@ -298,6 +298,80 @@ func (d *Device) available() (int, error) {
 		return 32, nil
 	}
 	return (int(wr) + 32 - int(rd)) % 32, nil
+}
+
+// Calibrate auto-calibrates the current of each LED.
+func (d *Device) Calibrate() error {
+	var ir []float64
+	var red []float64
+	var err error
+
+	irAmp := 0.0
+	redAmp := 0.0
+
+	if _, err = d.Options(
+		IRPulseAmp(irAmp),
+		RedPulseAmp(redAmp),
+	); err != nil {
+		return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
+	}
+
+	for mean(ir) < 0.4 {
+		if irAmp >= 5 {
+			break
+		}
+		irAmp += 0.2
+
+		if _, err = d.Options(
+			IRPulseAmp(irAmp),
+		); err != nil {
+			return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
+		}
+		time.Sleep(20 * time.Millisecond)
+
+		ir, red, err = d.IRRedBatch()
+		if err != nil {
+			return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
+		}
+	}
+
+	for mean(red) < 0.4 {
+		if redAmp >= 5 {
+			break
+		}
+		redAmp += 0.2
+
+		if _, err = d.Options(
+			RedPulseAmp(redAmp),
+		); err != nil {
+			return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
+		}
+		time.Sleep(20 * time.Millisecond)
+
+		ir, red, err = d.IRRedBatch()
+		if err != nil {
+			return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
+		}
+	}
+
+	fmt.Println("calibration:")
+	fmt.Printf("  irAmp = %.1fmA\n", irAmp)
+	fmt.Printf("  redAmp = %.1fmA\n", redAmp)
+
+	return nil
+}
+
+func mean(a []float64) float64 {
+	if len(a) == 0 {
+		return 0
+	}
+
+	r := 0.0
+	for _, v := range a {
+		r += v
+	}
+
+	return r / float64(len(a))
 }
 
 // Shutdown sets the device into power-save mode.

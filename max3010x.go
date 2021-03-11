@@ -73,6 +73,10 @@ func New() (*Device, error) {
 		return nil, fmt.Errorf("max3010x: could not get revision ID: %w", err)
 	}
 
+	if err := sensor.Calibrate(); err != nil {
+		return nil, err
+	}
+
 	d.redLED.init(64, 16)
 	d.irLED.init(64, 16)
 	d.readCh <- struct{}{}
@@ -188,7 +192,7 @@ func (d *Device) HeartRate() (float64, error) {
 func (d *Device) detectFall() error {
 	var r1, r2 float64
 	var err error
-	const iter = 8
+	const iter = 4
 	count := iter
 	err = d.ledsSingle()
 	if err != nil {
