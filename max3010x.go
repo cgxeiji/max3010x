@@ -33,20 +33,22 @@ type Device struct {
 	irLED  tSeries
 	readCh chan struct{}
 
+	bus  string
+	addr uint16
+
 	// PartID is the byte part ID as set by the manufacturer.
 	// MAX30100: 0x11 or max30100.PartID
 	// MAX30102: 0x15 or max30102.PartID
 	PartID byte
 	RevID  byte
-
-	bus string
-	addr uint16
 }
 
 type sensor interface {
 	Temperature() (float64, error)
 	RevID() (byte, error)
 	Reset() error
+	Calibrate() error
+
 	IRRed() (float64, float64, error)
 	IRRedBatch() ([]float64, []float64, error)
 
@@ -60,32 +62,24 @@ const threshold = 0.10
 
 // New returns a new MAX3010x device.
 func New(options ...Option) (*Device, error) {
-	var (
-		d = &Device{
-			readCh: make(chan struct{}, 1),
-		}
-		err error
-	)
+	d := &Device{
+		readCh: make(chan struct{}, 1),
+	}
 
 	for _, option := range options {
-		option.Apply(d)
+		option(d)
 	}
 
-	if d.sensor == nil {
-		d.sensor, err = max30102.New(d.bus, d.addr)
-		if err != nil {
-			return nil, err
-		}
+	sensor, err := max30102.New(d.bus, d.addr)
+	if err != nil {
+		return nil, err
 	}
+	d.sensor = sensor
 
 	d.PartID = max30102.PartID
 
 	if d.RevID, err = d.sensor.RevID(); err != nil {
 		return nil, fmt.Errorf("max3010x: could not get revision ID: %w", err)
-	}
-
-	if err := sensor.Calibrate(); err != nil {
-		return nil, err
 	}
 
 	d.redLED.init(64, 16)

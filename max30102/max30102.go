@@ -329,14 +329,14 @@ func (d *Device) Calibrate() error {
 		if irAmp >= 5 {
 			break
 		}
-		irAmp += 0.2
+		irAmp += 0.5
 
 		if _, err = d.Options(
 			IRPulseAmp(irAmp),
 		); err != nil {
 			return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(40 * time.Millisecond)
 
 		ir, red, err = d.IRRedBatch()
 		if err != nil {
@@ -348,14 +348,14 @@ func (d *Device) Calibrate() error {
 		if redAmp >= 5 {
 			break
 		}
-		redAmp += 0.2
+		redAmp += 0.5
 
 		if _, err = d.Options(
 			RedPulseAmp(redAmp),
 		); err != nil {
 			return fmt.Errorf("max30102: could not calibrate sensor: %w", err)
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(40 * time.Millisecond)
 
 		ir, red, err = d.IRRedBatch()
 		if err != nil {
