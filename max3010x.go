@@ -38,6 +38,9 @@ type Device struct {
 	// MAX30102: 0x15 or max30102.PartID
 	PartID byte
 	RevID  byte
+
+	bus string
+	addr uint16
 }
 
 type sensor interface {
@@ -56,15 +59,23 @@ type sensor interface {
 const threshold = 0.10
 
 // New returns a new MAX3010x device.
-func New() (*Device, error) {
-	sensor, err := max30102.New()
-	if err != nil {
-		return nil, err
+func New(options ...Option) (*Device, error) {
+	var (
+		d = &Device{
+			readCh: make(chan struct{}, 1),
+		}
+		err error
+	)
+
+	for _, option := range options {
+		option.Apply(d)
 	}
 
-	d := &Device{
-		sensor: sensor,
-		readCh: make(chan struct{}, 1),
+	if d.sensor == nil {
+		d.sensor, err = max30102.New(d.bus, d.addr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	d.PartID = max30102.PartID
