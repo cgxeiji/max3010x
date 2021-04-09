@@ -1,6 +1,7 @@
 package max3010x
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -13,29 +14,34 @@ import (
 // ErrNotDetected error. If the sensor cannot detect a beat after 1s, it
 // returns 0 with an ErrTooNoisy error.
 func (d *Device) HeartRate() (float64, error) {
-	// refresh the sensor data with up to date values
-	err := d.leds()
-	if err != nil {
-		return 0, fmt.Errorf("max3010x: could not refresh data: %w", err)
-	}
-
-	if err := d.detectBeat(); errors.Is(err, errLowValue) {
-		return 0, fmt.Errorf("max3010x: could not get heart rate: %w", ErrNotDetected)
-	} else if err != nil {
-		return 0, fmt.Errorf("max3010x: could not get heart rate: %w", err)
-	}
-
 	type beatPkg struct {
 		span float64
 		err  error
 	}
 	beatCh := make(chan beatPkg)
 
-	go func() {
-		for {
-			timer := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	defer cancel()
 
-			if err := d.detectBeat(); err != nil {
+	go func(ctx context.Context) {
+		if err := d.detectBeat(ctx); err != nil {
+			beatCh <- beatPkg{
+				err: err,
+			}
+			return
+		}
+		timer := time.Now()
+
+		for {
+			select {
+			case <-ctx.Done():
+				beatCh <- beatPkg{
+					err: ctx.Err(),
+				}
+			default:
+			}
+
+			if err := d.detectBeat(ctx); err != nil {
 				beatCh <- beatPkg{
 					err: err,
 				}
@@ -55,10 +61,10 @@ func (d *Device) HeartRate() (float64, error) {
 			}
 			break
 		}
-	}()
+	}(ctx)
 
 	select {
-	case <-time.After(1 * time.Second):
+	case <-ctx.Done():
 		return 0, fmt.Errorf("max3010x: could not get heart rate: %w", ErrTooNoisy)
 
 	case b := <-beatCh:
@@ -81,8 +87,14 @@ func (d *Device) HeartRate() (float64, error) {
 	return 60000 / d.hr.mean, nil
 }
 
-func (d *Device) detectBeat() error {
+func (d *Device) detectBeat(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		err := d.ledsSingle()
 		if err != nil {
 			return fmt.Errorf("detectBeat: %w", err)

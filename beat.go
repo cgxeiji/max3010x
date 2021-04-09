@@ -31,7 +31,7 @@ func (b *beat) check(signal float64) bool {
 	// Rising edge
 	if b.signal.ac.prev < 0 && ac >= 0 {
 		delta := b.signal.ac.max - b.signal.ac.min
-		if delta > 1 && delta < 50 {
+		if delta > 0.5 && delta < 50 {
 			beat = true
 		}
 
