@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"periph.io/x/periph/conn/i2c"
-	"periph.io/x/periph/conn/i2c/i2creg"
-	"periph.io/x/periph/host"
+	"github.com/cgxeiji/serial"
 )
 
 var (
@@ -18,8 +16,7 @@ var (
 
 // Device defines a MAX30102 device.
 type Device struct {
-	dev *i2c.Dev
-	bus i2c.BusCloser
+	i2c *serial.I2C
 }
 
 // New returns a new MAX30102 device. By default, this sets the LED pulse
@@ -30,27 +27,17 @@ type Device struct {
 // Argument "addr" can be used to specify alternative address if default (0x57) is unavailable and changed.
 // If "busName" argument is specified as an empty string "" the first available bus will be used.
 func New(busName string, addr uint16) (*Device, error) {
-	if _, err := host.Init(); err != nil {
-		return nil, fmt.Errorf("max30102: could not initialize host: %w", err)
-	}
-
-	bus, err := i2creg.Open(busName)
-	if err != nil {
-		return nil, fmt.Errorf("max30102: could not open I2C bus: %w", err)
-	}
-
 	if addr == 0 {
 		addr = Addr
 	}
 
-	dev := &i2c.Dev{
-		Addr: addr,
-		Bus:  bus,
+	i2c, err := serial.NewI2C(busName, addr)
+	if err != nil {
+		return nil, fmt.Errorf("max30102: could not initialize I2C: %w", err)
 	}
 
 	d := &Device{
-		dev: dev,
-		bus: bus,
+		i2c: i2c,
 	}
 
 	part, err := d.Read(RegPartID)
@@ -84,7 +71,7 @@ func New(busName string, addr uint16) (*Device, error) {
 // Close closes the device and cleans after itself.
 func (d *Device) Close() {
 	d.Shutdown()
-	d.bus.Close()
+	d.i2c.Close()
 }
 
 // RevID returns the revision ID of the device.
@@ -161,36 +148,17 @@ func (d *Device) Temperature() (float64, error) {
 
 // Read reads a single byte from a register.
 func (d *Device) Read(reg byte) (byte, error) {
-	b := make([]byte, 1)
-	if err := d.dev.Tx([]byte{reg}, b); err != nil {
-		return 0, fmt.Errorf("max30102: could not read byte: %w", err)
-	}
-
-	return b[0], nil
+	return d.i2c.Read(reg)
 }
 
 // ReadBytes reads n bytes from a register.
 func (d *Device) ReadBytes(reg byte, n int) ([]byte, error) {
-	b := make([]byte, n)
-	if err := d.dev.Tx([]byte{reg}, b); err != nil {
-		return nil, fmt.Errorf("max30102: could not read %d bytes: %w", n, err)
-	}
-
-	return b, nil
+	return d.i2c.ReadBytes(reg, n)
 }
 
 // Write writes a byte to a register.
 func (d *Device) Write(reg, data byte) error {
-	n, err := d.dev.Write([]byte{reg, data})
-	if err != nil {
-		return err
-	}
-	n-- // remove register write
-	if n != 1 {
-		return fmt.Errorf("write: wrong number of bytes written: want %d, got %d", 1, n)
-	}
-
-	return nil
+	return d.i2c.Write(reg, data)
 }
 
 // Reset resets the device. All configurations, thresholds, and data registers

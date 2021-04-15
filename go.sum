@@ -1,2 +1,4 @@
-periph.io/x/periph v3.6.4+incompatible h1:8FyXTbu9lcMVofz8mf+cj1pzTLN4V6EuPY2EF+DoJF4=
-periph.io/x/periph v3.6.4+incompatible/go.mod h1:EWr+FCIU2dBWz5/wSWeiIUJTriYv9v2j2ENBmgYyy7Y=
+github.com/cgxeiji/serial v0.1.1 h1:VsEAp4yy3Uh9JiYqZqxRib64/ZIUxvjEXNvmnsar59E=
+github.com/cgxeiji/serial v0.1.1/go.mod h1:S4Jo4DlWsP3QH6LvxTfmMedV50wDQmdbWny2XHlsXxc=
+periph.io/x/periph v3.6.7+incompatible h1:ZfRdHbcxVekgSJZmxp3873YpxNdWs6wg7waDCF7GB18=
+periph.io/x/periph v3.6.7+incompatible/go.mod h1:EWr+FCIU2dBWz5/wSWeiIUJTriYv9v2j2ENBmgYyy7Y=
