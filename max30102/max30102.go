@@ -81,7 +81,7 @@ func New(busName string, addr uint16) (*Device, error) {
 	return d, nil
 }
 
-// Close closes the devices and cleans after itself.
+// Close closes the device and cleans after itself.
 func (d *Device) Close() {
 	d.Shutdown()
 	d.bus.Close()
@@ -169,7 +169,7 @@ func (d *Device) Read(reg byte) (byte, error) {
 	return b[0], nil
 }
 
-// ReadBytes read n bytes from a register.
+// ReadBytes reads n bytes from a register.
 func (d *Device) ReadBytes(reg byte, n int) ([]byte, error) {
 	b := make([]byte, n)
 	if err := d.dev.Tx([]byte{reg}, b); err != nil {
